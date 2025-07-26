@@ -76,13 +76,38 @@ class DPPify:
         class DynamicDPP(DPP):
             questions: List[Question] = Field(description=f"A list of exactly {total_questions} questions.")
 
-        user_prompt = f"""Topic name: {topic_name}
-Language: {language}
-Total number of questions: {total_questions}
-Difficulty level: {difficulty_level}
-Additional instructions:{additional_instruction}
+        user_prompt = f"""Generate a Daily Practice Problem (DPP) sheet with ABSOLUTE PRECISION using ONLY the following specifications:
 
-Create the PDF by following the prompts,given data and the additional instructions."""
+TOPIC: {topic_name}
+LANGUAGE: {language}
+EXACT QUESTION COUNT: {total_questions} (non-negotiable - must be exactly this number)
+DIFFICULTY: {difficulty_level}
+ADDITIONAL INSTRUCTIONS: {additional_instruction}
+
+CRITICAL EXECUTION RULES:
+1. FOLLOW ADDITIONAL INSTRUCTIONS TO THE LETTER - These override all other considerations
+2. Generate EXACTLY {total_questions} questions - no more, no less (validate count before output)
+3. All content MUST be in {language} without any exceptions
+4. Difficulty level {difficulty_level} must be consistently maintained throughout
+5. Structure MUST include:
+   - Topic header with {topic_name}
+   - Clear instructions section incorporating ALL additional instructions
+   - Numbered questions (1 to {total_questions}) with no extra content
+
+MANDATORY COMPLIANCE CHECKS:
+✓ Verify every additional instruction is implemented
+✓ Confirm question count is precisely {total_questions}
+✓ Ensure zero content outside specifications
+✓ Validate all text is in {language}
+✓ Cross-check difficulty consistency
+
+OUTPUT REQUIREMENTS:
+- JSON format matching DPP schema EXCLUSIVELY
+- 'questions' array must contain exactly {total_questions} items
+- NO explanations, disclaimers, or extra text
+- STRICTLY follow additional instructions above all else
+
+WARNING: Any deviation from specifications or additional instructions will invalidate the output. Prioritize instruction compliance over creativity."""
         
         agent = Agent(
             model=Cerebras(id="qwen-3-235b-a22b", api_key=api_key,max_completion_tokens=40000),
@@ -156,5 +181,3 @@ Create the PDF by following the prompts,given data and the additional instructio
             # Catch any other unexpected errors
             logging.error(f"An unexpected error occurred in the DPP generation process: {e}")
             raise RuntimeError(f"An unexpected error occurred: {e}")
-        
-
