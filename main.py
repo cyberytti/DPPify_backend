@@ -1,20 +1,39 @@
-from fastapi import FastAPI
+# ---------- KEEP-ALIVE (run first) ----------
 import os
+import threading
 import time
-from backend.main_agent import DPPify
-from pydantic import BaseModel
-from typing import Literal
+import requests
+
+SELF_URL = os.environ.get("RENDER_EXTERNAL_URL")     # Render injects this
+KEEP_ALIVE_PATH = "/"                           # or any cheap endpoint
+PING_EVERY = 30                                 # seconds
+
+def _keep_alive():
+    if not SELF_URL:            # local dev – skip
+        return
+    while True:
+        try:
+            requests.get(f"{SELF_URL.rstrip('/')}{KEEP_ALIVE_PATH}", timeout=10)
+        except Exception:
+            pass                # ignore hiccups
+        time.sleep(PING_EVERY)
+
+if SELF_URL:
+    threading.Thread(target=_keep_alive, daemon=True).start()
+
+# ---------- YOUR ORIGINAL FastAPI APP ----------
+from fastapi import FastAPI
 import subprocess
 import re
 import pathlib
-import requests
-
+from backend.main_agent import DPPify
+from pydantic import BaseModel
+from typing import Literal
 
 # Get the api key from environment variable
 api_key = os.environ.get('CEREBRAS_API_KEY')
 
-
-app=FastAPI()
+app = FastAPI()
 
 class DPPify_input(BaseModel):
     topic_name: str
@@ -26,21 +45,22 @@ class DPPify_input(BaseModel):
 
 
 def upload_pdf(file_path: str) -> str:
-    with open(file_path, 'rb') as f:
-        response = requests.post('https://tmpfiles.org/api/v1/upload', files={'file': f})
+    with open(file_path, "rb") as f:
+        response = requests.post(
+            "https://tmpfiles.org/api/v1/upload",
+            files={"file": f},
+            timeout=30
+        )
     response.raise_for_status()
     data = response.json()
-    # Convert download URL format
-    download_url = data['data']['url']
+    download_url = data["data"]["url"]
     os.remove(file_path)
-    return download_url.replace('tmpfiles.org', 'tmpfiles.org/dl')
-
-
+    return download_url.replace("tmpfiles.org", "tmpfiles.org/dl")
 
 
 @app.post("/genarate_dpp/")
 async def genarate_pdf(agent_inputs: DPPify_input):
-    pdf_path=DPPify().run(
+    pdf_path = DPPify().run(
         topic_name=agent_inputs.topic_name,
         question_type=agent_inputs.question_type,
         total_q=agent_inputs.total_q,
@@ -50,6 +70,5 @@ async def genarate_pdf(agent_inputs: DPPify_input):
         additional_instruction=agent_inputs.additional_instruction
     )
 
-    pdf_url=upload_pdf(pdf_path)
-
+    pdf_url = upload_pdf(pdf_path)
     return pdf_url
